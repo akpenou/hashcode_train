@@ -107,6 +107,24 @@ def sort_slices(tab_counter, slices):
     return sorted(map(lambda x: score_slice(tab_counter, x), slices), key = lambda x: x['score'])
 
 
+def case_in_slice(case, _slice):
+    x, y = case
+    min_y, min_x, max_y, max_x = _slice
+    return not (min_x <= x <= max_x and min_y <= y <= max_y)
+
+def list_slices(sorted_slices):
+    slices = sorted_slices.copy()
+    res = list()
+    while slices:
+        tmp = slices.pop(0)
+        res.append(tmp)
+        min_y, min_x, max_y, max_x = tmp['slice']
+        for x, y in [ (x, y) for x in range(min_x, max_x + 1) for y in range(min_y, max_y + 1) ]:
+            slices = list(filter(lambda item: case_in_slice((x, y),
+                item['slice']), slices))
+    return res
+
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print('usage: python3 {:s} file'.format(sys.argv[0]))
@@ -135,8 +153,12 @@ if __name__ == '__main__':
     print('')
     print('#   SORTED SLICES   #')
     print('count:', len(saved_forms))
-    for form in sort_slices(tab_counter, saved_forms):
+    sorted_slices = sort_slices(tab_counter, saved_forms)
+    for form in sorted_slices:
         print(form)
-
-
-
+    res = list_slices(sorted_slices)
+    print('')
+    print('#   FINAL SLICE   #')
+    print('len slice:', len(res))
+    for _slice in res:
+        print(_slice['slice'])
