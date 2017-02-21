@@ -56,20 +56,55 @@ def is_valid(pos, form, min_ing, tab, size):
     return 0
 
 
+def make_coords(max_x: int, max_y: int):
+    return ((x, y) for y in range(max_y) for x in range(max_x))
+
+
 def counter(tab_ref, tab_counter, forms, meta):
+    """ Make the counter map.
+
+    The counter map help to see the avaibility of each case.
+
+    Args:
+        tab_ref: the pizza tab
+        tab_counter: tab initlized at 0
+        forms: the valid forms
+        meta: mate information of the game
+
+    Returns:
+        The counter_tab and the valid slices.
+    """
+    saved_forms = list()
     tab_x, tab_y = meta['cols'], meta['rows']
-    for x, y in [(x, y) for y in range(tab_y) for x in range(tab_x)]:
-        for form in forms:
-            form_x, form_y = form
-            if not is_valid((x,y), form, meta['min_ing'], tab_ref,
-                    (meta['cols'], meta['rows'])):
-                continue
-            for pos_x, pos_y in [ (pos_x, pos_y) for pos_x in range(form_x) for
-                    pos_y in range(form_y)]:
+    tab_coord = (tab_x, tab_y)
+    min_ing = meta['min_ing']
+
+    for x, y in make_coords(tab_x, tab_y):
+        form_filter = lambda f: is_valid((x,y), f, min_ing, tab_ref, tab_coord)
+        for form_x, form_y in filter(form_filter, forms):
+            saved_forms.append((y, x, y + form_y - 1, x + form_x - 1))
+            for pos_x, pos_y in make_coords(form_x, form_y):
                 tab_counter[pos_y + y][pos_x + x] += 1
+
+    # print the result
     for line in tab_counter:
         print(line)
-    return tab_counter
+
+    return tab_counter, saved_forms
+
+
+def score_slice(tab_counter, _slice):
+    min_y, min_x, max_y, max_x = _slice
+    index = 0
+    res = 0
+    for x, y in ( (x, y) for x in range(min_x, max_x + 1) for y in range(min_y, max_y + 1) ):
+        res += tab_counter[y][x]
+        index += 1
+    return {'score': res / index, 'slice': _slice}
+
+
+def sort_slices(tab_counter, slices):
+    return sorted(map(lambda x: score_slice(tab_counter, x), slices), key = lambda x: x['score'])
 
 
 if __name__ == '__main__':
@@ -90,7 +125,18 @@ if __name__ == '__main__':
         print(lines)
     print('')
     print('#   COUNTER   #')
-    counter(tab, [ [ 0 for x in range(meta['cols']) ] for y in
+    tab_counter, saved_forms = counter(tab, [ [ 0 for x in range(meta['cols']) ] for y in
         range(meta['rows']) ], forms, meta)
+    print('')
+    print('#   SLICES   #')
+    print('count:', len(saved_forms))
+    for form in saved_forms:
+        print(form)
+    print('')
+    print('#   SORTED SLICES   #')
+    print('count:', len(saved_forms))
+    for form in sort_slices(tab_counter, saved_forms):
+        print(form)
+
 
 
