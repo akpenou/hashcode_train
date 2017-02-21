@@ -126,7 +126,7 @@ def list_slices(sorted_slices):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in [2, 3]:
         print('usage: python3 {:s} file'.format(sys.argv[0]))
         exit(os.EX_DATAERR)
     meta, tab = parsing(sys.argv[1])
@@ -162,3 +162,9 @@ if __name__ == '__main__':
     print('len slice:', len(res))
     for _slice in res:
         print(_slice['slice'])
+    if len(sys.argv) == 3:
+        with open(sys.argv[2], 'w') as f:
+            print(len(res), file = f)
+            for _slice in res:
+                y1, x1, y2, x2 = _slice['slice']
+                print(y1, x1, y2, x2, file = f)
