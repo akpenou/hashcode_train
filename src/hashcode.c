@@ -1,44 +1,4 @@
-#include <stdio.h>
-#include <stdlib.>
-#include <stdarg.h>
-
-typedef struct		s_slice
-{
-	struct s_slice	*next;
-	unsigned int	min_x;
-	unsigned int	min_y;
-	unsigned int	max_x;
-	unsigned int	max_y;
-	float			mean;
-}					t_slice;
-
-typedef struct		s_meta
-{
-	unsigned int	rows;
-	unsigned int	cols;
-	unsigned int	min_ing;
-	unsigned int	max_area
-	char			**tab;
-	unsigned int	**counter_tab;
-}					t_meta;
-
-typedef struct		s_form
-{
-	struct s_form	*next;
-	unsigned int	x;
-	unsigned int	y;
-}					t_form;
-
-typedef struct		s_coord
-{
-	unsigned int	x;
-	unsigned int	y;
-}					t_coord;
-
-typedef struct		s_list
-{
-	struct s_list	*next;
-}					t_list;
+#include <hashcode.h>
 
 void	*ft_memalloc(size_t size)
 {
@@ -81,6 +41,19 @@ t_form	*make_form(unsigned int x, unsigned int y)
 	return (form);
 }
 
+t_slice	*make_slice(t_pos pos, t_form form, float mean)
+{
+	t_slice	*slice;
+
+	if (!(slice = malloc(sizeof(t_slice))))
+		return (NULL);
+	slice->min = pos;
+	slice->max.x = pos.x + form.x - 1;
+	slice->max.y = pos.y + form.y - 1;
+	slice->next = NULL;
+	return (slice);
+}
+
 t_form *get_form(unsigned int min_area, unsigned int max_area)
 {
 	unsigned int	x;
@@ -108,7 +81,7 @@ t_form *get_form(unsigned int min_area, unsigned int max_area)
 	return(tmp);
 }
 
-char	is_good_slice(t_coord pos, t_form form, t_meta *meta)
+t_slice	*good_slice(t_coord pos, t_form form, t_meta *meta)
 {
 	int	mushrooms, tomatos = 0;
 	t_coord	tmp;
@@ -124,7 +97,7 @@ char	is_good_slice(t_coord pos, t_form form, t_meta *meta)
 			else
 				tomatos++;
 			if (mushrooms >= meta.min_ing && tomatos >= meta.min_ing)
-				return (1);
+				return (make_slice(pos, form));
 		}
 	}
 	return (0);
@@ -141,60 +114,127 @@ char	filter_good_slice(t_form *form, va_list args)
 	return (res);
 }
 
-void	*filter(char (*fn)(void *, va_list), t_list *lst, ...)
+void	*filter(char (*fn)(void *, va_list), t_list *lst, char _free, ...)
 {
 	va_list	args;
-	t_list	*res, *tmp = NULL;
+	t_list	*res, *tmp, *ptr = NULL;
 
-	va_start(args, lst);
-	while (lst && !fn(lst, args))
+	va_start(args, _free);
+	while ((ptr = lst) && !fn(lst, args))
+	{
 		lst = lst->next;
+		if (_free)
+			free(ptr);
+	}
 	if (!(res = lst))
 		return (NULL);
 	tmp = res;
-	while ((lst = lst->next))
+	while ((ptr = lst) && (lst = lst->next))
 	{
 		if (fn(lst, args))
 		{
 			tmp->next = lst;
 			tmp = tmp->next;
 		}
+		if (_free)
+			free(ptr);
 	}
+	if (_free)
+		free(ptr);
 	va_end(args);
 	return (res);
 }
 
-void	*map(void *(*fn)(void *, va_list), t_list *lst, ...)
+void	*map(void *(*fn)(void *, va_list), t_list *lst, char _free, ...)
 {
 	va_list	args;
-	t_list	*res, *tmp = NULL;
+	t_list	*res, *tmp, *ptr = NULL;
 
-	va_start(args, lst);
+	va_start(args, _free);
 	if (!lst)
 		return (NULL);
 	res = fn(lst, args);
 	tmp = res;
+	ptr = lst;
 	while ((lst = lst->next))
 	{
+		if (_free)
+			free(ptr);
 		tmp->next = fn(lst, args);
 		tmp = tmp->next;
+		ptr = lst;
 	}
+	if (_free)
+		free(ptr);
 	va_end(args);
 	return (res);
 }
 
-void	foreach(void (*fn)(void *, va_list), t_list *lst, ...)
+void	*map_filtred(void *(*fn)(void *, va_list), t_list *lst, char _free, ...)
 {
 	va_list	args;
+	t_list	*res, *tmp, *ptr = NULL;
 
-	va_start(args, lst);
+	va_start(args, _free);
+	if (!lst)
+		return (NULL);
+	while ((ptr = lst) && !(res = fn(lst, args)))
+		lst = lst->next;
+	tmp = res;
+	ptr = lst;
+	while ((lst = lst->next))
+	{
+		if (_free)
+			free(ptr);
+		if (!(tmp->next = fn(lst, args)))
+			tmp = tmp->next;
+		ptr = lst;
+	}
+	if (_free)
+		free(ptr);
+	va_end(args);
+	return (res);
+}
+
+void	foreach(void (*fn)(void *, va_list), t_list *lst, char _free, ...)
+{
+	va_list	args;
+	void	*ptr;
+
+	va_start(args, _free);
 	if (!lst)
 		return ;
 	fn(lst, args);
+	ptr = lst;
 	while ((lst = lst->next))
+	{
+		if (_free)
+			free(ptr);
 		fn(lst, args);
+		ptr = lst;
+	}
+	if (_free)
+		free(ptr);
 	va_end(args);
 	return (res);
+}
+
+void	free_lst(t_lst	*ptr)
+{
+	t_lst	*tmp;
+	
+	while ((tmp = ptr))
+	{
+		ptr = ptr->next;
+		free(tmp);
+	}
+}
+
+void 	end_list(t_lst *lst)
+{
+	while (lst->next)
+		lst = lst->next;
+	return (lst);
 }
 
 void	counter(t_meta *meta, t_form *forms)
@@ -208,7 +248,7 @@ void	counter(t_meta *meta, t_form *forms)
 	for (pos.x = 0 ; pos.x < meta->cols ; pos.x++)
 		for (pos.y = 0 ; pos.y < meta->rows ; pos.y++)
 		{
-			tmp->next = filter(filter_good_slice, forms, pos, meta);
-
+			tmp->next = filter(filter_good_slice, forms, 0, pos, meta);
+			tmp = end_list(tmp);
 		}
 }
