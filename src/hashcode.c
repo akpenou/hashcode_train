@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.>
+#include <stdarg.h>
 
 typedef struct		s_slice
 {
@@ -129,27 +130,85 @@ char	is_good_slice(t_coord pos, t_form form, t_meta *meta)
 	return (0);
 }
 
-void	*filter(char (*fn)(void *), t_list *lst)
+char	filter_good_slice(t_form *form, va_list args)
 {
+	char	res;
+	va_list	args_cpy;
+
+	va_copy(args_cpy, args);
+	res = is_good_slice(va_arg(args_cpy, t_pos), *form, va_arg(args_cpy, t_meta *));
+	va_end(args_cpy);
+	return (res);
+}
+
+void	*filter(char (*fn)(void *, va_list), t_list *lst, ...)
+{
+	va_list	args;
 	t_list	*res, *tmp = NULL;
 
-	while (lst && !fn(lst))
+	va_start(args, lst);
+	while (lst && !fn(lst, args))
 		lst = lst->next;
 	if (!(res = lst))
 		return (NULL);
 	tmp = res;
 	while ((lst = lst->next))
 	{
-		if (fn(lst))
+		if (fn(lst, args))
 		{
 			tmp->next = lst;
 			tmp = tmp->next;
 		}
 	}
+	va_end(args);
+	return (res);
+}
+
+void	*map(void *(*fn)(void *, va_list), t_list *lst, ...)
+{
+	va_list	args;
+	t_list	*res, *tmp = NULL;
+
+	va_start(args, lst);
+	if (!lst)
+		return (NULL);
+	res = fn(lst, args);
+	tmp = res;
+	while ((lst = lst->next))
+	{
+		tmp->next = fn(lst, args);
+		tmp = tmp->next;
+	}
+	va_end(args);
+	return (res);
+}
+
+void	foreach(void (*fn)(void *, va_list), t_list *lst, ...)
+{
+	va_list	args;
+
+	va_start(args, lst);
+	if (!lst)
+		return ;
+	fn(lst, args);
+	while ((lst = lst->next))
+		fn(lst, args);
+	va_end(args);
 	return (res);
 }
 
 void	counter(t_meta *meta, t_form *forms)
 {
+	t_coord	pos;
+	t_coord tmp_pos;
+	t_form	*res_forms = make_form(0, 0);
+	t_form	*tmp;
 
+	tmp = res_forms;
+	for (pos.x = 0 ; pos.x < meta->cols ; pos.x++)
+		for (pos.y = 0 ; pos.y < meta->rows ; pos.y++)
+		{
+			tmp->next = filter(filter_good_slice, forms, pos, meta);
+
+		}
 }
